@@ -1,0 +1,23 @@
+{
+  "name": "generator",
+  "version": "1.0.0",
+  "description": "Static generator for late-night-snack",
+  "main": "index.js",
+  "scripts": {
+    "build": "node src/index.js",
+    "watch": "nodemon src/index.js"
+  },
+  "author": "zenoamaro <zenoamaro@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "js-beautify": "^1.7.4",
+    "marked": "^0.3.6",
+    "mkdirp": "^0.5.1",
+    "node-glob": "^1.2.0",
+    "rimraf": "^2.6.2",
+    "slug": "^0.9.1"
+  },
+  "devDependencies": {
+    "nodemon": "^1.12.1"
+  }
+}

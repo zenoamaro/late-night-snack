@@ -1,0 +1,12 @@
+{
+  "verbose": true,
+  "delay": 2000,
+  "ext": "md,js,json,html,css,png,jpeg,svg",
+  "watch": [
+    "../articles",
+    "."
+  ],
+  "ignore": [
+    "node_modules/*"
+  ]
+}
