@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="author" content="zenoamaro (zenoamaro@gmail.com)">
+    <link rel="author" href="https://github.com/zenoamaro">
+    <title>Late Night Snack</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=VT323|Source+Sans+Pro:400,400i,600" />
+    <link rel="stylesheet" href="syntax.css" /> </head>
+
+<body>
+    <nav id="navigation">
+        <div class="navigation-content"> <a href="/" rel="index" class="link title">Late Night Snack</a> <a href="/" rel="index" class="link index">&lt;&lt; All listings</a> </div>
+    </nav>
+    <div id="article">
+        <div class="section no-source">
+            <div class="section-content">
+                <div class="annotation">
+                    <div class="wrapper">
+                        <h1 id="a-virtual-stack-machine">A virtual stack machine</h1>
+                        <p>17 February 2018 — <a href="https://latenightsnack.io">https://latenightsnack.io</a></p>
+                        <p>A <a href="https://en.wikipedia.org/wiki/Virtual_machine">virtual machine</a> is a simulated computer. Computers are highly predictable machines, whose behavior only depend on their program, inputs, and previous <a href="https://en.wikipedia.org/wiki/State_(computer_science)">state</a>.
+                            If we have knowledge of all those elements, we can reproduce the machine in software entirely.</p>
+                        <p>Specifically, this is a <a href="https://en.wikipedia.org/wiki/Stack_machine">stack machine</a>, which gets its name from the <a href="https://en.wikipedia.org/wiki/Stack_(abstract_data_type)">stack</a> it uses as its main data
+                            structure. A stack is a pile of values, where entries get placed and taken from the top. Most operations <em>pop</em> one or two operands from the top of the stack, and <em>push</em> back the results.</p>
+                        <p>This is not an emulator of a real machine, but an <em>ideal</em> machine, with infinite memory and few limitations on data size, where all instructions execute in one cycle, and there is no need to respect tight timings or synchronize
+                            with other devices. This is only possible because it runs on a high-level run-time (the javascript engine) which abstract all of these problems away from us.</p>
+                        <p>I designed this machine to be nimble, readable, yet expressive and fun to play with.</p>
+                        <p><a href="https://github.com/zenoamaro/late-night-snack/blob/master/2018-02-17%20A%20virtual%20stack%20machine.js">Get the code</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="section ">
+            <div class="section-content">
+                <div class="annotation">
+                    <div class="wrapper">
+                        <h2 id="let-s-start-with-a-program">Let&#39;s start with a program</h2>
+                        <p>This is a short program that computes ten iterations of the <a href="https://en.wikipedia.org/wiki/Fibonacci_sequence">fibonacci sequence</a>.</p>
+                        <p>A program is a contiguous sequence of numbers, called <a href="https://en.wikipedia.org/wiki/Opcode">opcodes</a>, each one representing a different <a href="https://en.wikipedia.org/wiki/Instruction_set_architecture">instruction</a>,
+                            optionally followed by their data. Together, they are referred to as the <a href="https://en.wikipedia.org/wiki/Machine_code">machine code</a>. Execution starts from the first instruction, and continues until the end of the
+                            program is reached.</p>
+                        <p>Our program memory is represented as <a href="https://en.wikipedia.org/wiki/Read-only_memory">read-only memory</a>, a type of memory that cannot be written back. It is the only external input our machines has. Program memory is
+                            separate from <a href="https://en.wikipedia.org/wiki/Random-access_memory">application
+memory</a>, a configuration known as <a href="https://en.wikipedia.org/wiki/Harvard_architecture">Harvard architecture</a>, and machine code cannot access it. Among other things, this means that a program cannot <a href="https://en.wikipedia.org/wiki/Self-modifying_code">modify itself</a>,
+                            or provide additional code for execution.</p>
+                        <p>The most astute among you might notice that this program could be much shorter, while retaining the same functionality. Try and see how much you can <a href="https://en.wikipedia.org/wiki/Program_optimization">optimize</a> it.</p>
+                    </div>
+                </div>
+                <div class="source editable executable"> <code>function main() {
+  compute([
+    // Initialize operands and counter, store into memory
+    0x01, 10, 0x01, 0, 0x07,            // PUSH 10; PUSH 0; STORE
+    0x01,  1, 0x01, 1, 0x07,            // PUSH  1; PUSH 1; STORE
+    0x01,  1, 0x01, 2, 0x07,            // PUSH  1; PUSH 2; STORE
+
+    // Load operands from memory into the stack
+    0x01, 1, 0x06,                      // PUSH 1; LOAD
+    0x01, 2, 0x06,                      // PUSH 2; LOAD
+    // Keep a copy of the first operand and sum them
+    0x04,                               // OVER
+    0x10,                               // ADD
+    // Printing consumes the value, so we duplicate it
+    0x03, 0x0F,                         // DUP; OUT
+    // Store result and previous operand into memory
+    0x01, 1, 0x07,                      // PUSH 1; STORE
+    0x01, 2, 0x07,                      // PUSH 2; STORE
+
+    // Load counter into the stack, decrement and store back
+    0x01, 0, 0x06,                      // PUSH 0; LOAD
+    0x01, 1, 0x11,                      // SUB 1
+    0x03, 0x01, 0, 0x07,                // DUP; PUSH 0; STORE
+    // Unless counter is zero, jump back to start of loop
+    0x01, -29, 0x0A,                    // PUSH -29; JNZ
+  ]);
+}</code> </div>
+            </div>
+        </div>
+        <div class="section no-source">
+            <div class="section-content">
+                <div class="annotation">
+                    <div class="wrapper">
+                        <h1 id="the-virtual-machine">The virtual machine</h1>
+                        <p>Let&#39;s design our <a href="https://en.wikipedia.org/wiki/Virtual_machine">virtual machine</a>:</p>
+                        <p><em>It shall be simple, straight-forward, and not too adorned. It
+shall be possible to understand all of it in a single reading.
+Everything we put in, has to be there for a reason.</em></p>
+                        <p><em>It shall be powerful enough to express many classic <a href="https://en.wikipedia.org/wiki/Algorithm">algorithms</a>
+and other interesting data processing problems, but not so powerful
+that it becomes complicated to understand.</em></p>
+                        <p><em>It shall be completely <a href="https://en.wikipedia.org/wiki/Determinism">deterministic</a>. Given the same state, it
+shall produce the same results. Nothing shall be hidden or
+implicit. Everything it does shall happen under the sun.</em></p>
+                        <p><em>Most importantly, it shall be easy and <a href="https://en.wikipedia.org/wiki/Fun">fun</a> to program for.</em></p>
+                        <p>Alright, let&#39;s get to it.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="section ">
+            <div class="section-content">
+                <div class="annotation">
+                    <div class="wrapper">
+                        <p>This data structure can represent the full <a href="https://en.wikipedia.org/wiki/State_(computer_science)">state</a> of the machine at any point in time. Given the same program and the same state, the machine will always produce
+                            the same results.</p>
+                        <p>The basic data type is the <a href="https://en.wikipedia.org/wiki/Floating-point_arithmetic">floating point</a> number. The contents of the <a href="https://en.wikipedia.org/wiki/Read-only_memory">program memory</a> are provided
+                            externally, and a <a href="https://en.wikipedia.org/wiki/Program_counter">program
+counter</a> points to the location of the next instruction to execute. A <a href="https://en.wikipedia.org/wiki/Bit_field">boolean flag</a> tracks whether the machine is halted. Neither <a href="https://en.wikipedia.org/wiki/Random-access_memory">application memory</a>                            or <a href="https://en.wikipedia.org/wiki/Stack_(abstract_data_type)">stack</a> are limited in size.</p>
+                    </div>
+                </div>
+                <div class="source  "> <code>function create(rom) {
+  return {
+    rom,                                // Program memory
+    pc: 0,                              // Program counter
+    ram: [],                            // Application memory
+    stack: [],                          // Data stack
+    halted: false,                      // Execution interrupted
+  };
+}</code> </div>
+            </div>
+        </div>
+        <div class="section ">
+            <div class="section-content">
+                <div class="annotation">
+                    <div class="wrapper">
+                        <p>The <a href="https://en.wikipedia.org/wiki/Instruction_cycle">fetch-decode-execute cycle</a> is the basic operational step of the machine. <a href="https://en.wikipedia.org/wiki/Opcode">Opcodes</a> are fetched from <a href="https://en.wikipedia.org/wiki/Read-only_memory">program memory</a>,
+                            and decoded into <a href="https://en.wikipedia.org/wiki/Instruction_set_architecture">instructions</a>, which are then <a href="https://en.wikipedia.org/wiki/Execution_(computing)">executed</a> internally, bringing the machine
+                            to a new state with the results of the operation.</p>
+                    </div>
+                </div>
+                <div class="source  "> <code>function cycle(state) {
+  if (state.halted) return;
+  const opcode = fetch(state);          // Fetch
+  const instruction = decode(opcode);   // Decode
+  instruction(state);                   // Execute
+  if (state.pc >= state.rom.length) state.halted = true;
+}</code> </div>
+            </div>
+        </div>
+        <div class="section ">
+            <div class="section-content">
+                <div class="annotation">
+                    <div class="wrapper">
+                        <p>Fetching an <a href="https://en.wikipedia.org/wiki/Opcode">opcode</a> involves reading a value from <a href="https://en.wikipedia.org/wiki/Read-only_memory">program
+memory</a>, at the location pointed to by the <a href="https://en.wikipedia.org/wiki/Program_counter">program counter</a>, which gets immediately incremented to be ready for the next fetch.</p>
+                    </div>
+                </div>
+                <div class="source  "> <code>function fetch(state) {
+  const value = state.rom[state.pc++];  // Increment PC after read
+  if (typeof value !== 'number') throw `Illegal value, '${value}'`;
+  return value;
+}</code> </div>
+            </div>
+        </div>
+        <div class="section ">
+            <div class="section-content">
+                <div class="annotation">
+                    <div class="wrapper">
+                        <p>An <a href="https://en.wikipedia.org/wiki/Opcode">opcode</a> is an instruction codified into a value. A <a href="#the-instructions">translation
+table</a> defines which instruction the opcode should map to. Most real machines employ a similar system, using a small memory to map opcodes to the appropriate circuitry.</p>
+                    </div>
+                </div>
+                <div class="source  "> <code>function decode(opcode) {
+  const instruction = instructions[opcode];
+  if (!instruction) throw `Illegal opcode, '${opcode}'`;
+  return instruction;
+}</code> </div>
+            </div>
+        </div>
+        <div class="section ">
+            <div class="section-content">
+                <div class="annotation">
+                    <div class="wrapper">
+                        <p>To simulate a complete run, we start from a clean state, like in a freshly-started machine, and we keep cycling from state to state until the machine halts.</p>
+                    </div>
+                </div>
+                <div class="source  "> <code>function compute(rom) {
+  const state = create(rom);
+  while (!state.halted) cycle(state);
+}</code> </div>
+            </div>
+        </div>
+        <div class="section no-source">
+            <div class="section-content">
+                <div class="annotation">
+                    <div class="wrapper">
+                        <h1 id="microinstructions">Microinstructions</h1>
+                        <p>To operate the machine, we define a set of <a href="https://en.wikipedia.org/wiki/Language_primitive#Microcode_primitives">primitives</a> that will be composed together to form the actual instructions. These primitives, called
+                            <a href="https://en.wikipedia.org/wiki/Microcode">microinstructions</a>, control specific subsystems of the machine, and stand at a lower level than even machine code.</p>
+                        <p>Their <a href="https://en.wikipedia.org/wiki/Orthogonality#Computer_science">orthogonality</a> is an important feature: they don&#39;t overlap in function, while covering still the entire feature set: this is what allows them to
+                            be composed in arbitrary fashions, to create many kinds of concrete instructions.</p>
+                        <p>Just by looking at them, you can get a good idea of what the core capabilities of a machine are.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="section ">
+            <div class="section-content">
+                <div class="annotation">
+                    <div class="wrapper">
+                        <h2 id="the-stack">The stack</h2>
+                        <p>The <a href="https://en.wikipedia.org/wiki/Stack_(abstract_data_type)">stack</a> is a collection of elements that is operated by placing or taking values from its tail. Most instructions consume one or more operands from the stack,
+                            and push back the results.</p>
+                        <p>This machine has just one stack, which is not part of application memory. There are no limits to its length, so we can push as many items as we want. Popping from an empty stack is very often a bug, so, conveniently, trying to
+                            do that produces an error.</p>
+                    </div>
+                </div>
+                <div class="source  "> <code>function push(state, value) {
+  state.stack.push(value);
+}
+
+function pop(state) {
+  if (state.stack.length < 1) throw 'Popping from empty stack';
+  return state.stack.pop();
+}</code> </div>
+            </div>
+        </div>
+        <div class="section ">
+            <div class="section-content">
+                <div class="annotation">
+                    <div class="wrapper">
+                        <h2 id="application-memory">Application memory</h2>
+                        <p><a href="https://en.wikipedia.org/wiki/Random-access_memory">Application memory</a> is an array of cells, each one identified by a sequential <a href="https://en.wikipedia.org/wiki/Memory_address">address</a> number and capable
+                            of holding one value. This type of memory can be read from and written to at any point in time and at arbitrary locations.</p>
+                        <p>There are no size limits, so there is a potentially infinite amount of locations. However, it&#39;s not allowed to address locations behind address zero.</p>
+                    </div>
+                </div>
+                <div class="source  "> <code>function load(state, address) {
+  if (address < 0) throw `Reading from illegal address, '${address}'`;
+  return state.ram[address] || 0;
+}
+
+function store(state, address, value) {
+  if (address < 0) throw `Writing to illegal address, '${address}'`;
+  state.ram[address] = value;
+}</code> </div>
+            </div>
+        </div>
+        <div class="section ">
+            <div class="section-content">
+                <div class="annotation">
+                    <div class="wrapper">
+                        <h2 id="control-flow">Control flow</h2>
+                        <p>By manipulating the value of the <a href="https://en.wikipedia.org/wiki/Program_counter">program counter</a>, execution can be moved to any point in the code, an operation called <a href="https://en.wikipedia.org/wiki/Branch_(computer_science)">jump</a>,
+                            giving the ability to execute code multiple times in a <a href="https://en.wikipedia.org/wiki/Control_flow#Loops">loop</a>.</p>
+                        <p>When we pair the jump with a condition that must be true, the jump operation becomes a conditional branch, referring to execution branching in two different paths.</p>
+                        <p>All the conditional branching operations can be generalized to a form such as <code>PREDICATE ? JUMP : SKIP</code>.</p>
+                    </div>
+                </div>
+                <div class="source  "> <code>function jump(state, address) {
+  if (address < 0) throw `Jumping before start of ROM`;
+  if (address >= state.rom.length) throw `Jumping after end of ROM`;
+  state.pc = address;
+}
+
+function branch(state, predicate) {
+  const offset = pop(state);
+  // Pop as many values as the parameters of the predicate function
+  const values = Array(predicate.length).fill(state).map(pop);
+  // Reverse order of values for a more natural usage
+  const satisfied = predicate(...values.reverse());
+  // Jump by an offset if the predicate is satisfied
+  if (satisfied) jump(state, state.pc + offset);
+}</code> </div>
+            </div>
+        </div>
+        <div class="section ">
+            <div class="section-content">
+                <div class="annotation">
+                    <div class="wrapper">
+                        <h2 id="operations">Operations</h2>
+                        <p>All of the value operations, whether they are arithmetic, bitwise, or simple stack mutations, operate in a similar way: they pop one or more operands from the stack, combine or shuffle them to get a new value, and push back the
+                            result. Therefore, we can generalize them to a form such as <code>A, B → B, A</code>.</p>
+                    </div>
+                </div>
+                <div class="source  "> <code>function operate(state, operation) {
+  // Pop as many values as the parameters of the operation function
+  const values = Array(operation.length).fill(state).map(pop);
+  // Reverse order of values for a more natural usage
+  const results = operation(...values.reverse());
+  // Push back each result in the same order
+  results.map(result => push(state, result));
+}</code> </div>
+            </div>
+        </div>
+        <div class="section no-source">
+            <div class="section-content">
+                <div class="annotation">
+                    <div class="wrapper">
+                        <h1 id="the-instruction-set">The instruction set</h1>
+                        <p>A machine is commonly defined by its <a href="https://en.wikipedia.org/wiki/Instruction_set_architecture">instruction set</a>. The amount, flexibility, and expressiveness of the instructions provided by the machine will make a
+                            developer remember it fondly, or hate it with their guts.</p>
+                        <p>The <a href="https://en.wikipedia.org/wiki/x86">x86</a> instruction set powering most desktop PCs, the <a href="https://en.wikipedia.org/wiki/ARM_architecture">ARM</a> set found in mobile phones, and the <a href="https://en.wikipedia.org/wiki/MOS_Technology_6502">6502</a>                            set of 8-bit consoles are famous examples of <a href="https://en.wikipedia.org/wiki/Instruction_set_architecture">instruction set architectures</a> that are in use today.</p>
+                        <p>Can there be an architecture other than instruction set? Of course! For example, the <a href="https://en.wikipedia.org/wiki/Zero_instruction_set_computer">zero-instruction set computer</a> can be said to have no instructions at
+                            all.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="section ">
+            <div class="section-content">
+                <div class="annotation">
+                    <div class="wrapper">
+                        <h2 id="the-translation-table">The translation table</h2>
+                        <p>This table maps each opcode to the instruction it references to. It is so that opcode <code>0x00</code> is mapped to the <code>NOP</code> instruction, <code>0x07</code> to <code>STORE</code>, <code>0x08</code> to <code>JMP</code>,
+                            and so on. Decoding an instruction is then just a matter of addressing this table with the value of the opcode.</p>
+                        <p>Each instruction is actually implemented as a <a href="https://en.wikipedia.org/wiki/Microprogram">microprogram</a>, made up of <a href="https://en.wikipedia.org/wiki/Microcode">microinstructions</a> to be executed in sequence.</p>
+                    </div>
+                </div>
+                <div class="source  "> <code>const instructions = [
+  /* 0x00 */  NOP,   PUSH,  DROP,  DUP,   OVER,  SWAP,  LOAD,  STORE,
+  /* 0x08 */  JMP,   JZ,    JNZ,   JE,    JG,    JL,    HALT,  OUT,
+  /* 0x10 */  ADD,   SUB,   MUL,   DIV,   MOD,   NOT,   AND,   OR,
+  /* 0x18 */
+];</code> </div>
+            </div>
+        </div>
+        <div class="section ">
+            <div class="section-content">
+                <div class="annotation">
+                    <div class="wrapper">
+                        <h2 id="stack-manipulation-instructions">Stack manipulation instructions</h2>
+                        <p>The main way to get data into the <a href="https://en.wikipedia.org/wiki/Stack_(abstract_data_type)">stack</a> is by pushing a <a href="https://en.wikipedia.org/wiki/Literal_(computer_programming)">literal</a> value, found in program
+                            code, on its top. In this machine, this is the only type of data that comes from the external world.</p>
+                        <p>Because operations consume the values they pop from the stack, there are ways to duplicate values needed for future operations. Operations might also need operands to be in a different order, and while there is no way to access
+                            arbitrary positions on the stack, it is still possible to limitedly reach over the top-most value.</p>
+                    </div>
+                </div>
+                <div class="source  "> <code>function PUSH(state) {
+  const value = fetch(state);
+  push(state, value);
+}
+
+function DROP(state) { return operate(state, (   a) => [       ]) }
+function DUP (state) { return operate(state, (   a) => [a, a   ]) }
+function SWAP(state) { return operate(state, (a, b) => [b, a   ]) }
+function OVER(state) { return operate(state, (a, b) => [a, b, a]) }</code> </div>
+            </div>
+        </div>
+        <div class="section ">
+            <div class="section-content">
+                <div class="annotation">
+                    <div class="wrapper">
+                        <h2 id="memory-access-instructions">Memory access instructions</h2>
+                        <p><a href="https://en.wikipedia.org/wiki/Random-access_memory">Random-access memory</a> allows reading and writing from and to arbitrary locations of memory. The <a href="https://en.wikipedia.org/wiki/Memory_address">address</a>                            of the location is always taken from the <a href="https://en.wikipedia.org/wiki/Stack_(abstract_data_type)">stack</a>. When reading from a location, a value is placed on top of the stack, otherwise, another value will be popped
+                            from the stack, to be written to memory.</p>
+                        <p>These are the <a href="https://en.wikipedia.org/wiki/Orthogonality#Computer_science">only instructions</a> dealing with application memory, while every other operation only operates on the stack. As such, it is less complicated,
+                            compared to machines where each instruction needs variants for each type of memory access, such as <a href="https://en.wikipedia.org/wiki/Complex_instruction_set_computer">CISC</a>.</p>
+                    </div>
+                </div>
+                <div class="source  "> <code>function LOAD(state) {
+  const address = pop(state);
+  const value = load(state, address);
+  push(state, value);
+}
+
+function STORE(state) {
+  const address = pop(state);
+  const value = pop(state);
+  store(state, address, value);
+}</code> </div>
+            </div>
+        </div>
+        <div class="section ">
+            <div class="section-content">
+                <div class="annotation">
+                    <div class="wrapper">
+                        <h2 id="control-flow-instructions">Control flow instructions</h2>
+                        <p>One of the defining characteristics of an all-purpose computer is the ability to execute the same code multiple times, or to redirect execution conditionally, so that it becomes possible to write generic code, capable of reacting
+                            to a variety of complex cases.</p>
+                        <p>Apart from unconditional jumps, which always move execution, all other jumps pop one or two values from the stack, and compare them together or to a known value. Given how common an operation it is, there are shortcuts to check
+                            for zero or non-zero values.</p>
+                        <p>One seemingly-useless operation, <code>NOP</code>, does exactly nothing. It is conveniently mapped as opcode <code>0x00</code> as a way to pad programs with empty, non-executable code; it is also an easy way to delete short sequences
+                            of instructions without shifting part of the program, all of which are useful techniques when creating machine code by hand.</p>
+                        <p>Additionally, the machine can be halted, and execution will stop.</p>
+                    </div>
+                </div>
+                <div class="source  "> <code>function JMP(state) { return branch(state, (    ) => true   ) }
+
+function  JZ(state) { return branch(state, (   a) => a === 0) }
+function JNZ(state) { return branch(state, (   a) => a !== 0) }
+
+function  JE(state) { return branch(state, (a, b) => a === b) }
+function  JG(state) { return branch(state, (a, b) => a > b  ) }
+function  JL(state) { return branch(state, (a, b) => a < b  ) }
+
+function NOP() {
+  // Does nothing
+}
+
+function HALT(state) {
+  state.halted = true;
+}</code> </div>
+            </div>
+        </div>
+        <div class="section ">
+            <div class="section-content">
+                <div class="annotation">
+                    <div class="wrapper">
+                        <h2 id="arithmetic-and-bit-wise-operations">Arithmetic and bit-wise operations</h2>
+                        <p>The basic value of the machine is the <a href="https://en.wikipedia.org/wiki/Floating-point_arithmetic">floating point</a> number, so a basic set of arithmetic operations to work on them is provided.</p>
+                        <p>Bit-wise instructions operate on the actual bits of the binary representation of a value, and are often used to invert conditions, determine the presence of specific bits, the evenness or the sign of a number, to merge sequences
+                            of bits together, and so on.</p>
+                    </div>
+                </div>
+                <div class="source  "> <code>function ADD(state) { return operate(state, (a, b) => [a + b]) }
+function SUB(state) { return operate(state, (a, b) => [a - b]) }
+function MUL(state) { return operate(state, (a, b) => [a * b]) }
+function DIV(state) { return operate(state, (a, b) => [a / b]) }
+function MOD(state) { return operate(state, (a, b) => [a % b]) }
+
+function NOT(state) { return operate(state, (   a) => [~a   ]) }
+function AND(state) { return operate(state, (a, b) => [a & b]) }
+function  OR(state) { return operate(state, (a, b) => [a | b]) }</code> </div>
+            </div>
+        </div>
+        <div class="section ">
+            <div class="section-content">
+                <div class="annotation">
+                    <div class="wrapper">
+                        <h2 id="output-instructions">Output instructions</h2>
+                        <p>The only way this machine has to communicate with the external world, is by outputting values to the screen. It is not strictly necessary, in order to perform a calculation, but we also want some gratification after all.</p>
+                    </div>
+                </div>
+                <div class="source  "> <code>function OUT(state) {
+  const value = pop(state);
+  console.log(value);
+}</code> </div>
+            </div>
+        </div>
+        <div class="section ">
+            <div class="section-content">
+                <div class="annotation">
+                    <div class="wrapper">
+                        <p>Finally, we start the whole thing.</p>
+                    </div>
+                </div>
+                <div class="source  "> <code>main();</code> </div>
+            </div>
+        </div>
+        <div class="section no-source">
+            <div class="section-content">
+                <div class="annotation">
+                    <div class="wrapper">
+                        <h1 id="where-to-go-from-here">Where to go from here</h1>
+                        <p>I only included these 24 instructions, to keep the overall design simple, yet useful, and not too distracting from the core concept of a programmable machine. However, you can invent new instructions to do all sort of useful and
+                            interesting things, like squaring numbers, generating <a href="https://en.wikipedia.org/wiki/Random_number_generation">random values</a>, breaking into a <a href="https://en.wikipedia.org/wiki/Debugger">debugger</a>, or accessing
+                            virtual <a href="https://en.wikipedia.org/wiki/Peripheral">peripherals</a>.</p>
+                        <p>Speaking of which, you might have noticed that this machine has no way to communicate with the external world. If you ask, I am sure that it is dying to <a href="https://en.wikipedia.org/wiki/Human–computer_interaction">interact with humans</a>                            or <a href="https://en.wikipedia.org/wiki/Machine_to_machine">other machines</a>. Why not provide a few instructions to read <a href="https://en.wikipedia.org/wiki/Input_(computer_science)">input</a> from the <a href="https://en.wikipedia.org/wiki/Computer_keyboard">keyboard</a>,
+                            or a <a href="https://en.wikipedia.org/wiki/Game_controller">game controller</a>?</p>
+                        <p>You might want to support text as well. But how do you represent text, when you only have numbers at your disposal? You use a <a href="https://en.wikipedia.org/wiki/Character_encoding">text
+encoding</a>, for example, the famous <a href="https://en.wikipedia.org/wiki/ASCII">ASCII encoding</a>, which maps numbers from <code>0</code> to <code>127</code> to characters from the latin alphabet, and vice-versa.</p>
+                        <p>At this point, why not add full <a href="https://en.wikipedia.org/wiki/Display_device">video</a> and <a href="https://en.wikipedia.org/wiki/Digital_audio">audio</a> capabilities? Some machines provide special instructions to operate
+                            their hardware, such as <code>LINE</code>, <code>COLOR</code>, <code>SOUND</code>, and our own <code>OUT</code> instruction. Other machines allow their programmers to directly control what appears on the screen by writing to
+                            <a href="https://en.wikipedia.org/wiki/Video_display_controller">video memory</a>, which is <a href="https://en.wikipedia.org/wiki/Memory-mapped_I/O">memory-mapped</a> to a specific memory region, so that writing a <code>97</code>                            at location <code>42</code> might make an <code>a</code> character appear at row <code>3</code>, column <code>2</code>, turn on a red pixel, or maybe play a musical note.</p>
+                        <p>You could <a href="https://en.wikipedia.org/wiki/Embedded_system">embed</a> this <a href="https://en.wikipedia.org/wiki/Virtual_machine">virtual machine</a> as part of some other program, why not? For example, you could use it
+                            to <a href="https://en.wikipedia.org/wiki/Controller_(computing)">control</a> a <a href="https://en.wikipedia.org/wiki/3D_printing">3d
+printer</a>, or an <a href="https://en.wikipedia.org/wiki/Internet_of_things">IOT sensor</a>. You could even use one to script your game, just like the legendary <a href="https://en.wikipedia.org/wiki/ScummVM">ScummVM</a> did.</p>
+                        <p>Finally, you can turn towards emulating real machines. The <a href="https://en.wikipedia.org/wiki/IBM_System/360_Model_25">IBM
+Model 25</a> mainframe played a very nice trick: it could load its microcode from <a href="https://en.wikipedia.org/wiki/Punched_card">punched card</a>, therefore being able to emulate other machines, and becoming compatible with code written for them.
+                            Or you could go deeper, and add details from physical machines: limited memory capacity, fixed-sized data types, complex timings, interrupts, and so on.</p>
+                        <p>Have a good night.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <nav id="navigation">
+        <div class="navigation-content"> <a href="/" rel="index" class="link title">Late Night Snack</a> <a href="/" rel="index" class="link index">&lt;&lt; All listings</a> </div>
+    </nav> <a href="https://github.com/zenoamaro/late-night-snack/blob/master/2018-02-17 A virtual stack machine.js" title="See on GitHub">
+    <img id="github-link" src="github.svg" alt="See on GitHub">
+  </a>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/javascript.min.js"></script>
+    <script src="scripts.js"></script>
+</body>
+
+</html>
