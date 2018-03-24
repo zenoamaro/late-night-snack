@@ -11,11 +11,11 @@
   --section-width: 1100px;
   --section-gutter: 70px;
   
-  --highlight-text-color: rgba(0, 0, 0, .7);
-  --highlight-background-color: #FEE94E;
+  --highlight-text-color: rgba(0, 0, 0, .85);
+  --highlight-background-color: rgb(255, 241, 133);
   --highlight-width: 700px;
 
-  --article-text-color: rgb(78, 94, 81);
+  --article-text-color: rgb(40, 60, 40);
   --emphasis-text-color: black;
 
   --cover-height: calc(16 * var(--line-height));
@@ -29,7 +29,7 @@
   --source-font-family: vt323, menlo, monaco, monospace;
   --source-font-size: 20px;
   --source-font-weight: 400;
-  --source-text-color: rgb(95, 114, 99);
+  --source-text-color: rgb(40, 60, 40);
   --source-width: 100%;
   --source-letter-spacing: 0;
 
@@ -211,7 +211,6 @@ code {
   -moz-hyphens: auto;
   -ms-hyphens: auto;
   hyphens: auto;
-  opacity: 0.7;
 }
 
 #navigation {
