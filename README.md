@@ -32,7 +32,7 @@ can binge on the internet, and stay up hacking, for as long as I
 desire. Yet, the desire to disconnect, travel with my mind on those
 magical incantations, never left me.
 
-This collection attempts to provide recreate that same feeling, by
+This collection attempts to recreate that same feeling, by
 providing fun, concise, and readable code listings, that can be read
 and fully understood in one snack-sized bite. The programs will be
 short and to-the-point, will treat interesting problems, and of course
