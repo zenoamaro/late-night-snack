@@ -24,7 +24,7 @@
  * I designed this machine to be nimble, readable, yet expressive and
  * fun to play with.
  * 
- * [Get the code]
+ * [Get the code] or [try it out]!
  * 
  * [virtual machine]: https://en.wikipedia.org/wiki/Virtual_machine
  * [state]: https://en.wikipedia.org/wiki/State_(computer_science)
@@ -32,6 +32,7 @@
  * [stack]: https://en.wikipedia.org/wiki/Stack_(abstract_data_type)
  * [registers]: https://en.wikipedia.org/wiki/Processor_register
  * [Get the code]: https://github.com/zenoamaro/late-night-snack/blob/master/2018-02-17%20A%20virtual%20stack%20machine.js
+ * [try it out]: https://jsbin.com/bacokob/edit?js,console
  */
 
 
